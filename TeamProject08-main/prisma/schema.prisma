@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model Customer {
+  id        Int      @id @default(autoincrement())
+  name      String
+  allergies String[]
+  createdAt DateTime @default(now()) @map("created_at")
+  dietary   String[]
+  tableId   Int      @map("table_id")
+  table     Table    @relation(fields: [tableId], references: [id])
+  orders    Order[]
+
+  @@index([name])
+  @@map("customers")
+}
+
+model MenuItem {
+  id           Int         @id @default(autoincrement())
+  name         String      @unique
+  description  String
+  price        Float
+  stock        Int
+  category     Category
+  isVegetarian Boolean     @map("is_vegetarian")
+  isGlutenFree Boolean     @map("is_gluten_free")
+  calories     Int
+  allergies    String[]
+  image        String      @default("/defaultNoFoodImage.jpg")
+  dietaries    String[]    @default([])
+  stripeId     String?     @map("stripe_id")
+  cost         Float       @default(0.00)
+  orderItems   OrderItem[]
+
+  @@index([category])
+  @@index([isVegetarian, isGlutenFree])
+  @@map("menu_items")
+}
+
+model Table {
+  id       Int         @id @default(autoincrement())
+  capacity Int
+  status   TableStatus @default(AVAILABLE)
+  Customer Customer[]
+  orders   Order[]
+
+  @@index([status])
+  @@map("tables")
+}
+
+model Order {
+  id          Int         @id @default(autoincrement())
+  status      OrderStatus @default(PENDING)
+  totalPrice  Float       @default(0.00) @map("total_price")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at")
+  customerId  Int         @map("customer_id")
+  waiterId    Int?        @map("waiter_id")
+  tableId     Int?        @map("table_id")
+  completedAt DateTime?   @map("completed_at")
+  paid        Boolean     @default(false)
+  paymentId   String?     @unique
+  orderItems  OrderItem[]
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  table       Table?      @relation(fields: [tableId], references: [id])
+  waiter      Staff?      @relation(fields: [waiterId], references: [id])
+
+  @@index([customerId])
+  @@index([waiterId])
+  @@index([tableId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+  quantity   Int      @default(1)
+  price      Float
+  note       String?
+  reason     String?
+  orderId    Int      @map("order_id")
+  menuItemId Int      @map("menu_item_id")
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([menuItemId])
+  @@map("order_items")
+}
+
+model Staff {
+  id       Int     @id @default(autoincrement())
+  name     String
+  username String  @unique
+  password String
+  role     Role    @default(WAITER)
+  orders   Order[]
+
+  @@index([role])
+  @@map("staff")
+}
+
+enum Category {
+  STARTER
+  MAIN
+  SIDE
+  DESSERT
+  DRINK
+}
+
+enum OrderStatus {
+  PENDING
+  READY_TO_COOK
+  COOKING
+  READY_TO_DELIVER
+  COMPLETED
+  CANCELLED
+  UNAVAILABLE
+}
+
+enum Role {
+  HEAD_CHEF
+  SOUS_CHEF
+  DISH_WASHER
+  PORTER
+  GRILL_CHEF
+  WAITER
+  MANAGER
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  MAINTENANCE
+}
